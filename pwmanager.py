@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+
+#Application's purpose
 """
 Simple local password manager MVP:
 - Encrypted SQLite storage (Fernet)
@@ -6,23 +8,26 @@ Simple local password manager MVP:
 - Optional TOTP storage (encrypted)
 """
 
+#importing required funcitons
 import sqlite3, os, sys, base64, time
-from getpass import getpass
-from typing import Optional
-import secrets, string
-from datetime import datetime
-import typer
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives import hashes
-from cryptography.fernet import Fernet, InvalidToken
+from getpass import getpass                                             #securily read passowrds
+from typing import Optional                                             #typed text could be either any type (str) or none
+import secrets, string                                                  #provides cryptographically random number generation
+from datetime import datetime                                           #for timestamps, datetime
+import typer                                                            #to intereact with terminal 
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC        #to turn master password into encryption key, PBKDF2 (password based key derivation function 2)
+from cryptography.hazmat.primitives import hashes                       #import the hashes being used to encrypt
+from cryptography.fernet import Fernet, InvalidToken                    #data protection and error handling if wrong password entered
 
-APP = typer.Typer()
-DB_PATH = "vault.db"
-SALT_KEY = "kdf_salt"
-ITER_KEY = "kdf_iters"
-DEFAULT_ITERS = 200_000
+APP = typer.Typer()             #creates application for terminal interface
+DB_PATH = "vault.db"            #database name        
+SALT_KEY = "kdf_salt"           #metadata keyname for storing salt in db
+ITER_KEY = "kdf_iters"          #key name for storing PBKDF2 iteration count
+DEFAULT_ITERS = 200_000         #default itertaion (high value makes brute force expensive)
 
 # ---------- crypto helpers ----------
+
+#funciton to derive 32 byte encryption key from password using PBKDF2
 def derive_key(password: str, salt: bytes, iterations: int) -> bytes:
     password_bytes = password.encode("utf-8")
     kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=iterations)
@@ -46,6 +51,8 @@ def decrypt(f: Fernet, data: Optional[bytes]) -> Optional[str]:
         raise RuntimeError("Incorrect master password or corrupted data.")
 
 # ---------- DB helpers ----------
+
+#initialize the db and store the crypto metadata
 def init_db(conn: sqlite3.Connection, salt: bytes, iters: int):
     cur = conn.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS entries (
@@ -72,6 +79,8 @@ def get_meta(conn: sqlite3.Connection, key: str) -> Optional[bytes]:
     return r[0] if r else None
 
 # ---------- password generator ----------
+
+#generates secure random password with configurable lengh and symbols
 def generate_password(length: int = 16, use_symbols: bool = True) -> str:
     alphabet = string.ascii_letters + string.digits
     if use_symbols:
